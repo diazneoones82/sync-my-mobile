@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Sync My Mobile</string>
+    <string name="oauth_redirect_scheme">syncmymobile</string>
+    <string name="oauth_redirect_uri">syncmymobile://oauth</string>
+    <string name="google_drive_client_id">REPLACE_WITH_GOOGLE_OAUTH_ANDROID_OR_WEB_CLIENT_ID</string>
+    <string name="onedrive_client_id">REPLACE_WITH_AZURE_APP_CLIENT_ID</string>
+    <string name="box_client_id">REPLACE_WITH_BOX_CLIENT_ID</string>
+</resources>

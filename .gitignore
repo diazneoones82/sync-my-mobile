@@ -1,0 +1,30 @@
+# Build outputs
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Android
+android-companion/.gradle/
+android-companion/app/build/
+android-companion/build/
+*.apk
+*.aab
+
+# iOS / Xcode
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,9 @@
+[project]
+name = "sync-my-mobile-windows"
+version = "0.1.0"
+description = "Windows desktop downloader for Sync My Mobile"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+sync-my-mobile = "sync_my_mobile.app:main"
