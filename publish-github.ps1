@@ -58,8 +58,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $FullName = if ($Owner) { "$Owner/$Repo" } else { $Repo }
-& $Gh repo view $FullName *> $null
-if ($LASTEXITCODE -ne 0) {
+$OldErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $Gh repo view $FullName 1>$null 2>$null
+$RepoExists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $OldErrorActionPreference
+if (-not $RepoExists) {
     if ($Owner) {
         & $Gh repo create $FullName --public --description $Description --source . --remote origin --push
     } else {
@@ -75,8 +79,12 @@ if ($LASTEXITCODE -ne 0) {
 $Desktop = "dist\Sync My Mobile Desktop.exe"
 $Android = "dist\Sync My Mobile Android.apk"
 if ((Test-Path $Desktop) -and (Test-Path $Android)) {
-    & $Gh release view v1.0.0 --repo $FullName *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $OldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $Gh release view v1.0.0 --repo $FullName 1>$null 2>$null
+    $ReleaseExists = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = $OldErrorActionPreference
+    if ($ReleaseExists) {
         & $Gh release upload v1.0.0 $Desktop $Android --repo $FullName --clobber
     } else {
         & $Gh release create v1.0.0 $Desktop $Android --repo $FullName --title "Sync My Mobile v1.0.0" --notes "Initial open-source release by Neo Apps."
