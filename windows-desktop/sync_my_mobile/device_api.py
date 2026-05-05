@@ -21,7 +21,7 @@ class Manifest:
 
 
 class DeviceApi:
-    def __init__(self, base_url: str, timeout: float = 15.0) -> None:
+    def __init__(self, base_url: str, timeout: float = 120.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
