@@ -19,12 +19,16 @@ android-companion/build/
 
 # iOS / Xcode
 DerivedData/
+**/.build/
+**/._*
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
 
 # OS/editor
 .DS_Store
+._*
 Thumbs.db
 .idea/
 .vscode/

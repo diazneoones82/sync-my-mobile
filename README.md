@@ -7,6 +7,7 @@ Sync My Mobile is an open-source LAN sync toolkit for moving selected mobile fil
 - `windows-desktop`: final Windows desktop app built with Python/Tkinter. It discovers phones, shows available files, downloads with parallel workers, supports tray minimize, dark mode, auto sync, and clearable download logs.
 - `android-companion`: native Android companion app. It lets users select phone storage or cloud files through Android pickers, starts LAN sync, and serves selected files to the desktop app.
 - `ios-companion`: native SwiftUI iPhone companion source project. It mirrors the APK flow where iOS allows, but must be built on macOS with Xcode and Apple signing.
+- `ios-companion/mac-desktop`: native macOS desktop downloader built with SwiftUI. It mirrors the Windows desktop workflow for Mac users.
 
 ## Final Builds
 
@@ -59,6 +60,46 @@ python -m PyInstaller --noconfirm --clean --windowed --onefile --name "Sync My M
 ## iOS
 
 Open `ios-companion/SyncMyMobileiOS.xcodeproj` on a Mac with Xcode. Set your Apple developer team, connect an iPhone, and run. iOS apps cannot be built or signed on Windows.
+
+Quick iPhone flow:
+
+1. Install the iOS app from Xcode.
+2. Open the app and allow Local Network access.
+3. Use `Choose Source > Cloud Files`, `Browse Files App`, or `On My iPhone Folder`.
+4. Tap `Start LAN Sync`.
+5. Keep the iPhone unlocked and the app in the foreground while downloading.
+6. Use the Windows or Mac desktop app to refresh and download.
+
+Full iOS instructions are in `ios-companion/README.md`.
+
+## macOS Desktop
+
+The macOS desktop app is in `ios-companion/mac-desktop`.
+
+Run from source on a Mac:
+
+```bash
+cd ios-companion/mac-desktop
+swift run
+```
+
+Build a release executable:
+
+```bash
+cd ios-companion/mac-desktop
+swift build -c release
+```
+
+Use it like the Windows app:
+
+1. Start LAN sync on the Android or iPhone companion.
+2. Open the Mac desktop app.
+3. Wait for the phone to appear, or add `PHONE_IP:47855` manually.
+4. Click `Refresh List`.
+5. Choose a download folder.
+6. Click `Download All`.
+
+Full Mac desktop instructions are in `ios-companion/mac-desktop/README.md`.
 
 ## Security Notes
 

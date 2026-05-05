@@ -73,15 +73,16 @@ struct ContentView: View {
             }
             .background(background.ignoresSafeArea())
             .confirmationDialog("Choose source", isPresented: $showSourceChooser) {
-                Button("Phone Internal Storage") { showPhoneFolderPicker = true }
+                Button("On My iPhone Folder") { model.addAppDocumentsFolder() }
+                Button("Browse Files App") { showPhoneFolderPicker = true }
                 Button("Cloud Files") { showCloudFilePicker = true }
                 Button("Cancel", role: .cancel) {}
             }
             .fileImporter(
                 isPresented: $showPhoneFolderPicker,
-                allowedContentTypes: [.folder],
+                allowedContentTypes: [.item],
                 allowsMultipleSelection: true,
-                onCompletion: model.addPhoneFolders,
+                onCompletion: model.addPhoneItems,
             )
             .fileImporter(
                 isPresented: $showCloudFilePicker,
@@ -92,7 +93,7 @@ struct ContentView: View {
             .alert("About Sync My Mobile", isPresented: $model.showAbout) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("Author: Bartholomew Diaz Michael\n\nDownloads selected iPhone Files app sources to the Windows desktop over the same local network.\nThe supporting desktop app discovers this phone and downloads files in parallel.")
+                Text("Author: Bartholomew Diaz Michael\n\nDownloads selected iPhone Files app sources to the Windows desktop over the same local network.\nThe supporting desktop app discovers this phone and downloads files in parallel. iOS only allows files and folders that you explicitly choose in the Files picker.")
             }
             .alert("Cloud Access Help", isPresented: $model.showCloudHelp) {
                 Button("OK", role: .cancel) {}
@@ -104,6 +105,9 @@ struct ContentView: View {
             } message: {
                 Text(model.status)
             }
+        }
+        .onAppear {
+            model.prepareLocalFilesFolder()
         }
         .preferredColorScheme(darkMode ? .dark : .light)
     }

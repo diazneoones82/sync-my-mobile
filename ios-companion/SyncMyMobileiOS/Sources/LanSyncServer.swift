@@ -74,7 +74,13 @@ final class LanSyncServer {
             let attributes = try FileManager.default.attributesOfItem(atPath: resolved.url.path)
             let length = (attributes[.size] as? NSNumber)?.int64Value ?? -1
             let handle = try FileHandle(forReadingFrom: resolved.url)
-            let header = httpHeader(status: 200, reason: "OK", contentType: "application/octet-stream", contentLength: length)
+            let header = httpHeader(
+                status: 200,
+                reason: "OK",
+                contentType: "application/octet-stream",
+                contentLength: length,
+                filename: resolved.url.lastPathComponent,
+            )
             connection.send(content: header, completion: .contentProcessed { [weak self] error in
                 if error != nil {
                     try? handle.close()
@@ -92,7 +98,7 @@ final class LanSyncServer {
     }
 
     private func sendNextChunk(handle: FileHandle, accessURL: URL, didAccess: Bool, connection: NWConnection) {
-        let chunk = handle.readData(ofLength: 256 * 1024)
+        let chunk = handle.readData(ofLength: 64 * 1024)
         if chunk.isEmpty {
             try? handle.close()
             if didAccess {
@@ -133,13 +139,24 @@ final class LanSyncServer {
         })
     }
 
-    private func httpHeader(status: Int, reason: String, contentType: String, contentLength: Int64) -> Data {
+    private func httpHeader(status: Int, reason: String, contentType: String, contentLength: Int64, filename: String? = nil) -> Data {
         var header = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: \(contentType)\r\n"
         if contentLength >= 0 {
             header += "Content-Length: \(contentLength)\r\n"
         }
+        if let filename {
+            header += "Content-Disposition: attachment; filename=\"\(Self.headerSafeFilename(filename))\"\r\n"
+        }
         header += "Connection: close\r\n\r\n"
         return Data(header.utf8)
+    }
+
+    private static func headerSafeFilename(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: "\"", with: "_")
+            .replacingOccurrences(of: "\r", with: "_")
+            .replacingOccurrences(of: "\n", with: "_")
     }
 
     private func queryParam(_ path: String, _ name: String) -> String? {

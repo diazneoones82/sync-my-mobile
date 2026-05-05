@@ -5,6 +5,7 @@ import UIKit
 let appID = "sync-my-mobile"
 let discoveryPort: UInt16 = 47854
 let httpPort: UInt16 = 47855
+let localFilesReadmeName = "README - Add Files Here.txt"
 
 @MainActor
 final class SyncModel: ObservableObject {
@@ -19,28 +20,58 @@ final class SyncModel: ObservableObject {
     private var server: LanSyncServer?
     private var beacon: UdpBeacon?
 
+    func prepareLocalFilesFolder() {
+        do {
+            _ = try SelectionStore.localFilesFolder()
+            status = "Local folder ready in Files > On My iPhone > Sync My Mobile"
+        } catch {
+            status = "Could not prepare local iPhone folder: \(error.localizedDescription)"
+            showStatusAlert = true
+        }
+    }
+
+    func addAppDocumentsFolder() {
+        do {
+            try store.addLocalFilesFolder()
+            refreshSummary()
+            status = "Using Files > On My iPhone > Sync My Mobile. Add files there, then tap Start LAN Sync or Refresh List."
+            showStatusAlert = true
+        } catch {
+            status = "Could not use local iPhone folder: \(error.localizedDescription)"
+            showStatusAlert = true
+        }
+    }
+
     func addCloudFiles(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            store.addFiles(urls)
+            let imported = store.addFiles(urls)
             refreshSummary()
-            let count = urls.count
-            status = count == 1 ? "1 cloud file selected." : "\(count) cloud files selected."
+            if imported == urls.count {
+                status = imported == 1 ? "1 cloud file selected." : "\(imported) cloud files selected."
+            } else {
+                status = "\(imported) of \(urls.count) cloud file(s) imported. Open cloud files once in Files if they are not downloaded locally, then select again."
+                showStatusAlert = true
+            }
         case .failure(let error):
             status = "File selection failed: \(error.localizedDescription)"
             showStatusAlert = true
         }
     }
 
-    func addPhoneFolders(_ result: Result<[URL], Error>) {
+    func addPhoneItems(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            store.addFolders(urls)
+            let imported = store.addPhoneItems(urls)
             refreshSummary()
-            let count = urls.count
-            status = count == 1 ? "1 phone folder selected." : "\(count) phone folders selected."
+            if imported == urls.count {
+                status = imported == 1 ? "1 phone item selected." : "\(imported) phone items selected."
+            } else {
+                status = "\(imported) of \(urls.count) phone item(s) imported. iOS only allows files or folders chosen through Files."
+                showStatusAlert = true
+            }
         case .failure(let error):
-            status = "Folder selection failed: \(error.localizedDescription)"
+            status = "Phone storage selection failed: \(error.localizedDescription)"
             showStatusAlert = true
         }
     }
@@ -86,7 +117,7 @@ final class SyncModel: ObservableObject {
 
 final class SelectionStore {
     private struct Source {
-        let bookmark: Data
+        let rootURL: URL
         let provider: String
         let displayName: String
         let isFolder: Bool
@@ -96,18 +127,39 @@ final class SelectionStore {
     private var sources: [Source] = []
     private var autoIntervalMinutes = 1
 
-    func addFiles(_ urls: [URL]) {
+    func addFiles(_ urls: [URL]) -> Int {
         add(urls: urls, isFolder: false)
     }
 
-    func addFolders(_ urls: [URL]) {
+    func addFolders(_ urls: [URL]) -> Int {
         add(urls: urls, isFolder: true)
+    }
+
+    func addPhoneItems(_ urls: [URL]) -> Int {
+        let folders = urls.filter { Self.isDirectory($0) }
+        let files = urls.filter { !Self.isDirectory($0) }
+        return add(urls: folders, isFolder: true) + add(urls: files, isFolder: false)
+    }
+
+    func addLocalFilesFolder() throws {
+        let folder = try Self.localFilesFolder()
+        lock.lock()
+        sources.removeAll {
+            $0.rootURL.standardizedFileURL == folder.standardizedFileURL
+        }
+        sources.append(Source(rootURL: folder, provider: "On My iPhone", displayName: "Sync My Mobile", isFolder: true))
+        lock.unlock()
     }
 
     func clear() {
         lock.lock()
+        let snapshot = sources
         sources.removeAll()
         lock.unlock()
+        for source in snapshot {
+            let parent = source.isFolder ? source.rootURL : source.rootURL.deletingLastPathComponent()
+            try? FileManager.default.removeItem(at: parent)
+        }
     }
 
     func setAutoInterval(_ value: Int) {
@@ -159,34 +211,29 @@ final class SelectionStore {
     }
 
     func resolveFileID(_ id: String) throws -> ResolvedFile {
-        if id.hasPrefix("file:") {
-            let encoded = String(id.dropFirst("file:".count))
-            guard let data = Data(base64Encoded: encoded) else { throw SyncFileError.notFound }
-            var stale = false
-            let url = try URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        if id.hasPrefix("local:") {
+            let encoded = String(id.dropFirst("local:".count))
+            guard let data = Data(base64Encoded: encoded), let path = String(data: data, encoding: .utf8) else { throw SyncFileError.notFound }
+            let url = URL(fileURLWithPath: path)
             return ResolvedFile(url: url, accessURL: url)
-        }
-
-        if id.hasPrefix("folder:") {
-            let parts = id.split(separator: ":", maxSplits: 2).map(String.init)
-            guard parts.count == 3,
-                  let data = Data(base64Encoded: parts[1]),
-                  let relative = parts[2].removingPercentEncoding else { throw SyncFileError.notFound }
-            var stale = false
-            let root = try URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
-            return ResolvedFile(url: root.appendingPathComponent(relative), accessURL: root)
         }
 
         throw SyncFileError.notFound
     }
 
-    private func add(urls: [URL], isFolder: Bool) {
+    private func add(urls: [URL], isFolder: Bool) -> Int {
         let newSources = urls.compactMap { url -> Source? in
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if didAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
             let provider = Self.providerName(for: url)
             let name = (try? url.resourceValues(forKeys: [.nameKey]))?.name ?? url.lastPathComponent
             do {
-                let bookmark = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-                return Source(bookmark: bookmark, provider: provider, displayName: name.isEmpty ? "Files" : name, isFolder: isFolder)
+                let imported = try Self.importSource(url, name: name, isFolder: isFolder)
+                return Source(rootURL: imported, provider: provider, displayName: name.isEmpty ? "Files" : name, isFolder: isFolder)
             } catch {
                 return nil
             }
@@ -194,6 +241,7 @@ final class SelectionStore {
         lock.lock()
         sources.append(contentsOf: newSources)
         lock.unlock()
+        return newSources.count
     }
 
     private func manifestFiles() -> [ManifestFile] {
@@ -214,18 +262,11 @@ final class SelectionStore {
     }
 
     private func singleManifestFile(_ source: Source) -> ManifestFile? {
-        guard let resolved = try? resolveFileID("file:\(source.bookmark.base64EncodedString())") else { return nil }
-        let didAccess = resolved.accessURL.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                resolved.accessURL.stopAccessingSecurityScopedResource()
-            }
-        }
-        guard resolved.url.isFileURL else { return nil }
-        let values = try? resolved.url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .nameKey])
-        let name = values?.name ?? resolved.url.lastPathComponent
+        guard source.rootURL.isFileURL else { return nil }
+        let values = try? source.rootURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .nameKey])
+        let name = values?.name ?? source.rootURL.lastPathComponent
         return ManifestFile(
-            id: "file:\(source.bookmark.base64EncodedString())",
+            id: Self.fileID(for: source.rootURL),
             relativePath: "\(source.provider)/\(name)",
             size: Int64(values?.fileSize ?? 0),
             modified: Int64((values?.contentModificationDate ?? .distantPast).timeIntervalSince1970 * 1000),
@@ -233,13 +274,7 @@ final class SelectionStore {
     }
 
     private func folderManifestFiles(_ source: Source) -> [ManifestFile] {
-        guard let root = try? resolveBookmark(source.bookmark) else { return [] }
-        let didAccess = root.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                root.stopAccessingSecurityScopedResource()
-            }
-        }
+        let root = source.rootURL
 
         let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .fileSizeKey, .contentModificationDateKey, .nameKey]
         guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else {
@@ -255,11 +290,13 @@ final class SelectionStore {
             guard values?.isRegularFile == true else {
                 continue
             }
+            if child.lastPathComponent == localFilesReadmeName {
+                continue
+            }
             let relative = child.path.replacingOccurrences(of: root.path + "/", with: "")
-            let encoded = relative.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? relative
             files.append(
                 ManifestFile(
-                    id: "folder:\(source.bookmark.base64EncodedString()):\(encoded)",
+                    id: Self.fileID(for: child),
                     relativePath: "\(source.provider)/\(source.displayName)/\(relative)",
                     size: Int64(values?.fileSize ?? 0),
                     modified: Int64((values?.contentModificationDate ?? .distantPast).timeIntervalSince1970 * 1000),
@@ -269,9 +306,76 @@ final class SelectionStore {
         return files
     }
 
-    private func resolveBookmark(_ data: Data) throws -> URL {
-        var stale = false
-        return try URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+    private static func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+    }
+
+    private static func fileID(for url: URL) -> String {
+        "local:\(Data(url.path.utf8).base64EncodedString())"
+    }
+
+    private static func importSource(_ url: URL, name: String, isFolder: Bool) throws -> URL {
+        let base = try importBaseDirectory()
+        let sourceDirectory = base.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
+
+        let displayName = name.isEmpty ? url.lastPathComponent : name
+        let destination = sourceDirectory.appendingPathComponent(displayName, isDirectory: isFolder)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try coordinatedCopy(from: url, to: destination)
+        return destination
+    }
+
+    private static func coordinatedCopy(from source: URL, to destination: URL) throws {
+        var coordinationError: NSError?
+        var copyError: Error?
+        NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: source, options: [], error: &coordinationError) { coordinatedURL in
+            do {
+                try FileManager.default.copyItem(at: coordinatedURL, to: destination)
+            } catch {
+                copyError = error
+            }
+        }
+        if let coordinationError {
+            throw coordinationError
+        }
+        if let copyError {
+            throw copyError
+        }
+    }
+
+    private static func importBaseDirectory() throws -> URL {
+        let appSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let directory = appSupport.appendingPathComponent("SelectedSources", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func localFilesFolder() throws -> URL {
+        let documents = try FileManager.default.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let readme = documents.appendingPathComponent(localFilesReadmeName)
+        if !FileManager.default.fileExists(atPath: readme.path) {
+            let text = """
+            Add files or folders next to this README from the iPhone Files app.
+
+            In Sync My Mobile, choose Source > On My iPhone Folder, then Start LAN Sync.
+            The desktop app will list and download files from this app folder.
+            """
+            try text.write(to: readme, atomically: true, encoding: .utf8)
+        }
+        return documents
     }
 
     private static func providerName(for url: URL) -> String {
