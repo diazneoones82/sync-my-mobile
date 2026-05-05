@@ -69,11 +69,17 @@ if (-not $RepoExists) {
     } else {
         & $Gh repo create $Repo --public --description $Description --source . --remote origin --push
     }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create GitHub repository '$FullName'. Check that the owner exists and that your account can create repositories there."
+    }
 } else {
     & $Git remote remove origin 2>$null
     & $Git remote add origin "https://github.com/$FullName.git"
     & $Git branch -M main
     & $Git push -u origin main
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to push source to GitHub repository '$FullName'."
+    }
 }
 
 $Desktop = "dist\Sync My Mobile Desktop.exe"
@@ -88,6 +94,9 @@ if ((Test-Path $Desktop) -and (Test-Path $Android)) {
         & $Gh release upload v1.0.0 $Desktop $Android --repo $FullName --clobber
     } else {
         & $Gh release create v1.0.0 $Desktop $Android --repo $FullName --title "Sync My Mobile v1.0.0" --notes "Initial open-source release by Neo Apps."
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to publish release assets for '$FullName'. If GitHub asks for workflow scope, run: gh auth refresh -h github.com -s workflow"
     }
 }
 
