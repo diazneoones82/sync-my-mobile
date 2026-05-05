@@ -1,6 +1,6 @@
 # Neo Apps / Sync My Mobile
 
-Sync My Mobile is an open-source LAN sync toolkit for moving selected mobile files to a Windows desktop when both devices are on the same network.
+Sync My Mobile is an open-source LAN sync toolkit for moving selected mobile files to Windows and Mac desktop apps when the devices are on the same network.
 
 ## Apps
 
@@ -11,12 +11,23 @@ Sync My Mobile is an open-source LAN sync toolkit for moving selected mobile fil
 
 ## Final Builds
 
-Final build artifacts are in `dist`:
+Final desktop and mobile artifacts are published from the GitHub Releases page:
+
+- `Sync My Mobile Desktop.exe`: Windows desktop app.
+- `Sync My Mobile Android.apk`: Android companion app.
+- `SyncMyMobileiOS-device-signed.ipa`: iPhone companion app signed for development/device testing.
+- `SyncMyMobileMac.app.zip`: signed macOS companion desktop app.
+
+Local Windows and Android build artifacts are created in `dist`:
 
 - `Sync My Mobile Desktop.exe`
 - `Sync My Mobile Android.apk`
 
 The Windows EXE file metadata uses `Neo Apps` as the company name. Windows will still show an unknown verified publisher unless the EXE is Authenticode-signed with a trusted code-signing certificate.
+
+The iOS IPA must be signed with an Apple developer team before it can run on a physical iPhone. A development-signed IPA only installs on devices allowed by that Apple account/provisioning profile. For broad distribution, use TestFlight or an App Store/Ad Hoc signing workflow.
+
+The macOS app zip contains `SyncMyMobileMac.app`, which displays as `Sync My Mobile` and is signed for local macOS launch. It is not notarized, so macOS may require `System Settings > Privacy & Security > Open Anyway` the first time it opens.
 
 ## How It Works
 
