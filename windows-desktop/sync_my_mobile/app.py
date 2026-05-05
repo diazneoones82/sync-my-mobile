@@ -112,7 +112,7 @@ class SyncMyMobileApp(tk.Tk):
         footer = ttk.Frame(self, padding=(12, 0, 12, 12), style="App.TFrame")
         footer.grid(row=3, column=0, sticky="ew")
         footer.columnconfigure(0, weight=1)
-        self.status_var = tk.StringVar(value="Waiting for Android companion on the same network...")
+        self.status_var = tk.StringVar(value="Waiting for mobile companion on the same network...")
         ttk.Label(footer, textvariable=self.status_var, style="Accent.TLabel").grid(row=0, column=0, sticky="w")
         self.progress = ttk.Progressbar(footer, mode="determinate")
         self.progress.grid(row=0, column=1, sticky="ew", padx=(8, 0))
@@ -185,7 +185,7 @@ class SyncMyMobileApp(tk.Tk):
         self.selected_device = self.devices.get(self.device_var.get())
 
     def _connect_by_ip(self) -> None:
-        value = simpledialog.askstring("Connect by IP", "Android phone IP or IP:port")
+        value = simpledialog.askstring("Connect by IP", "Mobile phone IP or IP:port")
         if not value:
             return
         host, _, port_text = value.strip().partition(":")
@@ -200,7 +200,7 @@ class SyncMyMobileApp(tk.Tk):
 
     def _load_manifest(self) -> None:
         if not self.selected_device:
-            messagebox.showinfo("Sync My Mobile", "Start the Android companion app on the same network first.")
+            messagebox.showinfo("Sync My Mobile", "Start the mobile companion app on the same network first.")
             return
         self.status_var.set("Loading manifest...")
         threading.Thread(target=self._load_manifest_worker, daemon=True).start()
@@ -230,7 +230,7 @@ class SyncMyMobileApp(tk.Tk):
 
     def _start_download(self) -> None:
         if not self.selected_device:
-            messagebox.showinfo("Sync My Mobile", "No Android device selected.")
+            messagebox.showinfo("Sync My Mobile", "No mobile device selected.")
             return
         if not self.manifest:
             self._load_manifest()
@@ -315,7 +315,7 @@ class SyncMyMobileApp(tk.Tk):
             "About Sync My Mobile",
             "Sync My Mobile\n\n"
             "Author: Bartholomew Diaz Michael\n\n"
-            "Downloads selected Android phone folders to a Windows desktop over the same local network.\n"
+            "Downloads selected Android or iPhone files to a Windows desktop over the same local network.\n"
             "The supporting desktop app discovers the phone, syncs files in parallel, and can run in the tray.",
         )
 

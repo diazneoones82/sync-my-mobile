@@ -23,6 +23,12 @@ $Git = $null
 if ($GitCommand) {
     $Git = $GitCommand.Source
 }
+if (-not $Git -and (Test-Path "C:\Program Files\Git\bin\git.exe")) {
+    $Git = "C:\Program Files\Git\bin\git.exe"
+}
+if (-not $Git -and (Test-Path "C:\Program Files\Git\cmd\git.exe")) {
+    $Git = "C:\Program Files\Git\cmd\git.exe"
+}
 if (-not $Git) {
     throw "Git was not found. Install Git for Windows from https://git-scm.com/download/win, then rerun this script."
 }
